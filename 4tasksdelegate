@@ -1,0 +1,546 @@
+using System.Globalization;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+
+namespace DelegatesHomework
+{
+    internal class Program
+    {
+        private static void Main()
+        {
+            RunArrayExamples();
+            RunActionFuncExamples();
+            RunCreditCardExample();
+            RunStringExamples();
+        }
+
+
+        private static void RunArrayExamples()
+        {
+            Console.WriteLine("№1");
+            Console.Write("Введіть цілі числа через пробіл або кому: ");
+
+            string input = Console.ReadLine() ?? string.Empty;
+            string[] parts = input.Split(
+                new[] { ' ', ',', ';', '\t' },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            var numbers = new List<int>();
+
+            foreach (string part in parts)
+            {
+                if (int.TryParse(part, out int number))
+                    numbers.Add(number);
+                else
+                    Console.WriteLine($"Значення \"{part}\" пропущено: це не ціле число.");
+            }
+
+            int[] array = numbers.ToArray();
+
+            Console.WriteLine("Парні:     " + string.Join(", ", ArrayOperations.GetEven(array)));
+            Console.WriteLine("Непарні:   " + string.Join(", ", ArrayOperations.GetOdd(array)));
+            Console.WriteLine("Прості:    " + string.Join(", ", ArrayOperations.GetPrimes(array)));
+            Console.WriteLine("Фібоначчі: " + string.Join(", ", ArrayOperations.GetFibonacci(array)));
+            Console.WriteLine();
+        }
+
+
+
+        private static void RunActionFuncExamples()
+        {
+            Action showTime = () =>
+                Console.WriteLine($"Поточний час: {DateTime.Now:HH:mm:ss}");
+
+            Action showDate = () =>
+                Console.WriteLine($"Поточна дата: {DateTime.Now:dd.MM.yyyy}");
+
+            Action showDayOfWeek = () =>
+                Console.WriteLine($"День тижня: {DateTime.Now:dddd}");
+
+            Func<decimal, decimal, decimal> triangleArea =
+                (basis, height) => basis * height / 2;
+
+            Func<decimal, decimal, decimal> rectangleArea =
+                (width, height) => width * height;
+
+            Console.WriteLine(2);
+            showTime();
+            showDate();
+            showDayOfWeek();
+
+            decimal triangleBasis = ReadPositiveDecimal("Введіть основу трикутника: ");
+            decimal triangleHeight = ReadPositiveDecimal("Введіть висоту трикутника: ");
+            Console.WriteLine($"Площа трикутника: {triangleArea(triangleBasis, triangleHeight)}");
+
+            decimal rectangleWidth = ReadPositiveDecimal("Введіть ширину прямокутника: ");
+            decimal rectangleHeight = ReadPositiveDecimal("Введіть висоту прямокутника: ");
+            Console.WriteLine($"Площа прямокутника: {rectangleArea(rectangleWidth, rectangleHeight)}");
+            Console.WriteLine();
+        }
+
+
+
+
+        private static void RunCreditCardExample()
+        {
+            Console.WriteLine("№3");
+
+            Console.Write("Введіть номер картки: ");
+            string cardNumber = ReadRequiredLine();
+
+            Console.Write("Введіть ПІБ власника: ");
+            string ownerName = ReadRequiredLine();
+
+            DateTime expirationDate = ReadDate("Введіть термін дії картки (дд.мм.рррр): ");
+
+            Console.Write("Введіть PIN-код (4 цифри): ");
+            string pin = ReadPin();
+
+            decimal creditLimit = ReadNonNegativeDecimal("Введіть кредитний ліміт: ");
+            decimal initialBalance = ReadNonNegativeDecimal("Введіть початкову суму грошей: ");
+            decimal targetAmount = ReadNonNegativeDecimal("Введіть суму для відстеження: ");
+
+            var card = new CreditCard(
+                cardNumber,
+                ownerName,
+                expirationDate,
+                pin,
+                creditLimit,
+                initialBalance,
+                targetAmount);
+
+            card.Deposited += (_, e) =>
+                Console.WriteLine(
+                    $"Поповнення на {e.Amount}. Баланс: {e.Balance}; використано кредиту: {e.CreditUsed}");
+
+            card.Spent += (_, e) =>
+                Console.WriteLine(
+                    $"Витрата {e.Amount}. Баланс: {e.Balance}; використано кредиту: {e.CreditUsed}");
+
+            card.CreditUsageStarted += (_, e) =>
+                Console.WriteLine($"Почалося використання кредитних коштів. Борг: {e.CreditUsed}");
+
+            card.TargetAmountReached += (_, e) =>
+                Console.WriteLine($"Досягнуто задану суму. Баланс: {e.Balance}");
+
+            card.PinChanged += (_, _) =>
+                Console.WriteLine("PIN-код успішно змінено.");
+
+            Console.WriteLine();
+            Console.WriteLine($"Картка власника {card.OwnerName}, дійсна до {card.ExpirationDate:dd.MM.yyyy}.");
+            Console.WriteLine($"Поточний баланс: {card.Balance}; кредитний ліміт: {card.CreditLimit}.");
+
+            while (true)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Оберіть дію: 1 — поповнити, 2 — витратити, 3 — змінити PIN, 0 — завершити");
+                Console.Write("Ваш вибір: ");
+                string choice = (Console.ReadLine() ?? string.Empty).Trim();
+
+                try
+                {
+                    if (choice == "1")
+                    {
+                        decimal amount = ReadPositiveDecimal("Введіть суму поповнення: ");
+                        card.Deposit(amount);
+                    }
+                    else if (choice == "2")
+                    {
+                        decimal amount = ReadPositiveDecimal("Введіть суму витрати: ");
+                        card.Spend(amount);
+                    }
+                    else if (choice == "3")
+                    {
+                        Console.Write("Введіть поточний PIN: ");
+                        string oldPin = ReadPin();
+
+                        Console.Write("Введіть новий PIN: ");
+                        string newPin = ReadPin();
+
+                        card.ChangePin(oldPin, newPin);
+                    }
+                    else if (choice == "0")
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Невідома команда. Спробуйте ще раз.");
+                    }
+                }
+                catch (ArgumentException ex)
+                {
+                    Console.WriteLine($"Помилка введення: {ex.Message}");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Console.WriteLine($"Операцію не виконано: {ex.Message}");
+                }
+            }
+
+            Console.WriteLine();
+        }
+
+
+
+
+
+        private static void RunStringExamples()
+        {
+            Console.WriteLine("№4");
+            Console.Write("Введіть рядок: ");
+            string text = Console.ReadLine() ?? string.Empty;
+
+            Func<string, int> countVowels = TextAnalysis.CountVowels;
+            Func<string, int> countConsonants = TextAnalysis.CountConsonants;
+            Func<string, int> getLength = TextAnalysis.GetLength;
+
+            Console.WriteLine($"Голосних: {countVowels(text)}");
+            Console.WriteLine($"Приголосних: {countConsonants(text)}");
+            Console.WriteLine($"Довжина рядка: {getLength(text)}");
+        }
+
+        private static string ReadRequiredLine()
+        {
+            while (true)
+            {
+                string value = Console.ReadLine() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value.Trim();
+
+                Console.Write("Значення не може бути порожнім. Введіть ще раз: ");
+            }
+        }
+
+        private static decimal ReadPositiveDecimal(string prompt)
+        {
+            while (true)
+            {
+                Console.Write(prompt);
+                if (TryReadDecimal(out decimal value) && value > 0)
+                    return value;
+
+                Console.WriteLine("Введіть коректне число, більше за нуль.");
+            }
+        }
+
+        private static decimal ReadNonNegativeDecimal(string prompt)
+        {
+            while (true)
+            {
+                Console.Write(prompt);
+                if (TryReadDecimal(out decimal value) && value >= 0)
+                    return value;
+
+                Console.WriteLine("Введіть коректне число, не менше нуля.");
+            }
+        }
+
+        private static bool TryReadDecimal(out decimal value)
+        {
+            string input = (Console.ReadLine() ?? string.Empty).Trim();
+
+            return decimal.TryParse(
+                       input,
+                       NumberStyles.Number,
+                       CultureInfo.CurrentCulture,
+                       out value)
+                   || decimal.TryParse(
+                       input.Replace(',', '.'),
+                       NumberStyles.Number,
+                       CultureInfo.InvariantCulture,
+                       out value);
+        }
+
+        private static DateTime ReadDate(string prompt)
+        {
+            while (true)
+            {
+                Console.Write(prompt);
+                if (DateTime.TryParseExact(
+                    Console.ReadLine(),
+                    "dd.MM.yyyy",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out DateTime date))
+                {
+                    return date;
+                }
+
+                Console.WriteLine("Неправильний формат дати. Приклад: 31.12.2028");
+            }
+        }
+
+        private static string ReadPin()
+        {
+            while (true)
+            {
+                string pin = Console.ReadLine() ?? string.Empty;
+
+                if (pin.Length == 4 &&
+                    pin[0] >= '0' && pin[0] <= '9' &&
+                    pin[1] >= '0' && pin[1] <= '9' &&
+                    pin[2] >= '0' && pin[2] <= '9' &&
+                    pin[3] >= '0' && pin[3] <= '9')
+                {
+                    return pin;
+                }
+
+                Console.Write("PIN має складатися з чотирьох цифр. Введіть ще раз: ");
+            }
+        }
+    }
+
+    internal static class ArrayOperations
+    {
+        public static int[] Filter(int[] numbers, Predicate<int> condition)
+        {
+            if (numbers == null)
+                throw new ArgumentNullException(nameof(numbers));
+
+            if (condition == null)
+                throw new ArgumentNullException(nameof(condition));
+
+            var result = new List<int>();
+
+            foreach (int number in numbers)
+            {
+                if (condition(number))
+                    result.Add(number);
+            }
+
+            return result.ToArray();
+        }
+
+        public static int[] GetEven(int[] numbers) =>
+            Filter(numbers, number => number % 2 == 0);
+
+        public static int[] GetOdd(int[] numbers) =>
+            Filter(numbers, number => number % 2 != 0);
+
+        public static int[] GetPrimes(int[] numbers) =>
+            Filter(numbers, IsPrime);
+
+        public static int[] GetFibonacci(int[] numbers) =>
+            Filter(numbers, IsFibonacci);
+
+        private static bool IsPrime(int number)
+        {
+            if (number < 2)
+                return false;
+
+            for (int divisor = 2; divisor <= number / divisor; divisor++)
+            {
+                if (number % divisor == 0)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsFibonacci(int number)
+        {
+            if (number < 0)
+                return false;
+
+            long previous = 0;
+            long current = 1;
+
+            while (previous <= number)
+            {
+                if (previous == number)
+                    return true;
+
+                long next = previous + current;
+                previous = current;
+                current = next;
+            }
+
+            return false;
+        }
+    }
+
+    internal sealed class CreditCard
+    {
+        private string _currentPin;
+
+        public string CardNumber { get; }
+        public string OwnerName { get; }
+        public DateTime ExpirationDate { get; }
+        public decimal CreditLimit { get; }
+        public decimal Balance { get; private set; }
+        public decimal CreditUsed { get; private set; }
+        public decimal TargetAmount { get; }
+
+        public event EventHandler<MoneyEventArgs> Deposited;
+        public event EventHandler<MoneyEventArgs> Spent;
+        public event EventHandler<MoneyEventArgs> CreditUsageStarted;
+        public event EventHandler<MoneyEventArgs> TargetAmountReached;
+        public event EventHandler PinChanged;
+
+        public CreditCard(
+            string cardNumber,
+            string ownerName,
+            DateTime expirationDate,
+            string pin,
+            decimal creditLimit,
+            decimal initialBalance,
+            decimal targetAmount)
+        {
+            if (string.IsNullOrWhiteSpace(cardNumber))
+                throw new ArgumentException("Номер картки не може бути порожнім.", nameof(cardNumber));
+
+            if (string.IsNullOrWhiteSpace(ownerName))
+                throw new ArgumentException("ПІБ власника не може бути порожнім.", nameof(ownerName));
+
+            ValidatePin(pin);
+
+            if (creditLimit < 0)
+                throw new ArgumentOutOfRangeException(nameof(creditLimit));
+
+            if (initialBalance < 0)
+                throw new ArgumentOutOfRangeException(nameof(initialBalance));
+
+            if (targetAmount < 0)
+                throw new ArgumentOutOfRangeException(nameof(targetAmount));
+
+            CardNumber = cardNumber;
+            OwnerName = ownerName;
+            ExpirationDate = expirationDate;
+            _currentPin = pin;
+            CreditLimit = creditLimit;
+            Balance = initialBalance;
+            TargetAmount = targetAmount;
+        }
+
+        public void Deposit(decimal amount)
+        {
+            ValidatePositiveAmount(amount);
+
+            decimal oldBalance = Balance;
+            decimal repayment = Math.Min(amount, CreditUsed);
+
+            CreditUsed -= repayment;
+            Balance += amount - repayment;
+
+            Deposited?.Invoke(this, CreateMoneyEventArgs(amount));
+
+            if (oldBalance < TargetAmount && Balance >= TargetAmount)
+                TargetAmountReached?.Invoke(this, CreateMoneyEventArgs(Balance));
+        }
+
+        public void Spend(decimal amount)
+        {
+            ValidatePositiveAmount(amount);
+
+            if (amount > Balance + CreditLimit - CreditUsed)
+                throw new InvalidOperationException("Недостатньо коштів і кредитного ліміту.");
+
+            decimal oldCreditUsed = CreditUsed;
+            decimal fromBalance = Math.Min(amount, Balance);
+
+            Balance -= fromBalance;
+            CreditUsed += amount - fromBalance;
+
+            if (oldCreditUsed == 0 && CreditUsed > 0)
+                CreditUsageStarted?.Invoke(this, CreateMoneyEventArgs(CreditUsed));
+
+            Spent?.Invoke(this, CreateMoneyEventArgs(amount));
+        }
+
+        public void ChangePin(string oldPin, string newPin)
+        {
+            if (!string.Equals(_currentPin, oldPin, StringComparison.Ordinal))
+                throw new InvalidOperationException("Неправильний поточний PIN-код.");
+
+            ValidatePin(newPin);
+
+            if (string.Equals(_currentPin, newPin, StringComparison.Ordinal))
+                throw new ArgumentException("Новий PIN має відрізнятися від поточного.", nameof(newPin));
+
+            _currentPin = newPin;
+            PinChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private MoneyEventArgs CreateMoneyEventArgs(decimal amount) =>
+            new MoneyEventArgs(amount, Balance, CreditUsed);
+
+        private static void ValidatePin(string pin)
+        {
+            if (pin == null || pin.Length != 4 ||
+                pin[0] < '0' || pin[0] > '9' ||
+                pin[1] < '0' || pin[1] > '9' ||
+                pin[2] < '0' || pin[2] > '9' ||
+                pin[3] < '0' || pin[3] > '9')
+            {
+                throw new ArgumentException("PIN має складатися з чотирьох цифр.", nameof(pin));
+            }
+        }
+
+        private static void ValidatePositiveAmount(decimal amount)
+        {
+            if (amount <= 0)
+                throw new ArgumentOutOfRangeException(nameof(amount), "Сума має бути більшою за нуль.");
+        }
+    }
+
+    internal sealed class MoneyEventArgs : EventArgs
+    {
+        public decimal Amount { get; }
+        public decimal Balance { get; }
+        public decimal CreditUsed { get; }
+
+        public MoneyEventArgs(decimal amount, decimal balance, decimal creditUsed)
+        {
+            Amount = amount;
+            Balance = balance;
+            CreditUsed = creditUsed;
+        }
+    }
+
+    internal static class TextAnalysis
+    {
+        private const string Vowels = "аеєиіїоуюяАЕЄИІЇОУЮЯaeiouAEIOU";
+
+        public static int CountVowels(string text)
+        {
+            if (text == null)
+                throw new ArgumentNullException(nameof(text));
+
+            int count = 0;
+
+            foreach (char character in text)
+            {
+                if (Vowels.IndexOf(character) >= 0)
+                    count++;
+            }
+
+            return count;
+        }
+
+        public static int CountConsonants(string text)
+        {
+            if (text == null)
+                throw new ArgumentNullException(nameof(text));
+
+            int count = 0;
+
+            foreach (char character in text)
+            {
+                if (char.IsLetter(character) && Vowels.IndexOf(character) < 0)
+                    count++;
+            }
+
+            return count;
+        }
+
+        public static int GetLength(string text)
+        {
+            if (text == null)
+                throw new ArgumentNullException(nameof(text));
+
+            return text.Length;
+        }
+    }
+}
